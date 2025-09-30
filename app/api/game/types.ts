@@ -1,56 +1,79 @@
-export interface GameSummary {
-  id: string;
-  title: string;
-  image: string;
-  rating: number;
-  reviews: string;
-  genre: string;
-  tags: string[];
-  price: string;
-  description: string;
-}
-
-export interface GameSearchItem {
-  id: string;
-  title: string;
-  price: number;
-  rating: number;
-  released: string;
-  genres: string[];
-  features: string[];
-  themes: string[];
-}
-
-export type GameDetailMedia = {
-  type: "image";
-  url: string;
-};
-
-export interface GameDetail {
-  slug: string;
-  id: number;
-  title: string;
-  price: number;
-  developer: string;
-  publisher: string;
-  released: string;
-  genres: string[];
-  features: string[];
-  themes: string[];
-  image?: string;
-  requirements: {
-    minimum: string[];
-    recommended: string[];
-  };
-  media: GameDetailMedia[];
-  news: {
-    id: string;
-    title: string;
-    date: string;
-  }[];
-}
-
 export interface ApiResult<T> {
   data: T;
   isMock: boolean;
+}
+
+export interface Game {
+  id: number;
+  name: string;
+  price: number;
+  discountRate: number;
+  tags: string[];
+  publisherId: number;
+  publisherName: string;
+  reviewCount: number;
+  averageScore: number;
+  media: string[];
+  spec: string;
+  description: string;
+  thumbnailUrl: string;
+  releaseDate: string; // =released
+}
+export interface GameCard {
+  id: number;
+  name: string;
+  price: number;
+  discountRate: number;
+  tags: string[];
+  publisherId: number;
+  publisherName: string;
+  reviewCount: number;
+  averageScore: number;
+  releaseDate: string; // =released
+  thumbnailUrl: string;
+}
+export interface GameDetail extends Game {
+  id: number;
+  name: string;
+  price: number;
+  discountRate: number;
+  tags: string[];
+  publisherId: number;
+  publisherName: string;
+  reviewCount: number;
+  averageScore: number;
+  releaseDate: string; // =released
+  media: string[];
+  spec: string;
+  description: string;
+}
+
+export interface GameNotice {
+  id: number;
+  title: string;
+  content: string;
+  releaseDate: string;
+  category: GameNoticeCategory;
+}
+export interface GameNoticeCategory {
+  displayName: string;
+  description: string;
+}
+
+export interface GamesResponse {
+  games: Game[];
+  currentPage: number;
+  totalPages: number;
+  totalElements: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+}
+
+export interface GameCardResponse {
+  games: GameCard[];
+  currentPage: number;
+  totalPages: number;
+  totalElements: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
 }
