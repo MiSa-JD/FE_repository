@@ -1,13 +1,13 @@
 import { create } from "zustand";
 import { getGames } from "../api/game/gameApi";
-import type { GameSummary } from "../api/game/types";
+import type { GameCard } from "../api/game/types";
 
 interface GameStoreState {
-  games: GameSummary[];
+  games: GameCard[];
   loading: boolean;
   error: string | null;
   isMock: boolean;
-  fetchGames: () => Promise<GameSummary[]>;
+  fetchGames: () => Promise<GameCard[]>;
 }
 
 export const useGameStore = create<GameStoreState>((set, get) => ({

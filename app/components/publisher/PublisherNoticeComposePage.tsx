@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { PublisherLayout } from "./PublisherLayout";
 import { PenSquare } from "lucide-react";
 import { useGameStore } from "../../stores/gameStore";
+import type { GameCard } from "../../api/game/types";
 
 const categoryLabels: Record<Exclude<NoticeCategory, "all">, string> = {
   update: "게임 업데이트",
@@ -27,21 +28,42 @@ const categoryLabels: Record<Exclude<NoticeCategory, "all">, string> = {
   news: "새 소식",
 };
 
+type PublisherGame = GameCard & {
+  title: string;
+  genre: string;
+  price: string;
+  description: string;
+};
+
+function adaptGameCardForPublisher(game: GameCard): PublisherGame {
+  return {
+    ...game,
+    title: game.name,
+    genre: game.tags[0] ?? "기타",
+    price: String(game.price ?? 0),
+    description: `${game.name} 공지가 준비 중입니다.`,
+  };
+}
+
 export default function PublisherNoticeComposePage() {
   const navigate = useNavigate();
-  const games = useGameStore((state) => state.games);
+  const rawGames = useGameStore((state) => state.games);
   const fetchGames = useGameStore((state) => state.fetchGames);
   const gamesLoading = useGameStore((state) => state.loading);
+  const games = useMemo(
+    () => rawGames.map(adaptGameCardForPublisher),
+    [rawGames]
+  );
   const gameOptions = useMemo(
     () => Array.from(new Set(games.map((game) => game.title))).sort(),
     [games]
   );
 
   useEffect(() => {
-    if (!games.length && !gamesLoading) {
+    if (!rawGames.length && !gamesLoading) {
       fetchGames();
     }
-  }, [fetchGames, games.length, gamesLoading]);
+  }, [fetchGames, rawGames.length, gamesLoading]);
 
   const [selectedGame, setSelectedGame] = useState<string>("");
   const [category, setCategory] =

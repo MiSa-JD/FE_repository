@@ -171,7 +171,7 @@ export function Header({ selectedCategory, onCategoryChange }: HeaderProps) {
       if (!normalized) return;
 
       const match = games.find((game) =>
-        game.title.toLowerCase().includes(normalized)
+        game.name.toLowerCase().includes(normalized)
       );
 
       if (match) {

@@ -8,6 +8,7 @@ import { Button } from "../y_ui/base/button";
 import { toast } from "sonner";
 import { formatCurrencyKRW } from "./utils/format";
 import { useGameStore } from "../../stores/gameStore";
+import type { GameCard } from "../../api/game/types";
 
 const warningPoints = [
   "플랫폼에서 게임이 비공개 처리됩니다.",
@@ -23,22 +24,42 @@ const saleStatusCycle = [
   "출시 예정",
 ] as const;
 
+type PublisherGame = GameCard & {
+  title: string;
+  genre: string;
+  price: string;
+};
+
+function adaptGameCardForPublisher(game: GameCard): PublisherGame {
+  return {
+    ...game,
+    title: game.name,
+    genre: game.tags[0] ?? "기타",
+    price: String(game.price ?? 0),
+  };
+}
+
 export default function PublisherGameDeletePage() {
   const navigate = useNavigate();
   const { gameId } = useParams<{ gameId: string }>();
-  const games = useGameStore((state) => state.games);
+  const rawGames = useGameStore((state) => state.games);
   const fetchGames = useGameStore((state) => state.fetchGames);
   const gamesLoading = useGameStore((state) => state.loading);
+  const games = useMemo(
+    () => rawGames.map(adaptGameCardForPublisher),
+    [rawGames]
+  );
 
   useEffect(() => {
-    if (!games.length && !gamesLoading) {
+    if (!rawGames.length && !gamesLoading) {
       fetchGames();
     }
-  }, [fetchGames, games.length, gamesLoading]);
+  }, [fetchGames, rawGames.length, gamesLoading]);
 
+  const numericGameId = gameId ? Number(gameId) : NaN;
   const game = useMemo(
-    () => games.find((item) => item.id === gameId),
-    [games, gameId]
+    () => games.find((item) => item.id === numericGameId),
+    [games, numericGameId]
   );
   const index = game ? games.findIndex((item) => item.id === game.id) : -1;
   const normalizedIndex = index >= 0 ? index : 0;

@@ -1,10 +1,10 @@
 import { GameSection } from "./GameSection";
 import { FeaturedGame } from "./FeaturedGame";
 import { GameCard } from "./GameCard";
-import { CategoriesSection } from "./CategoriesSection";
 import { NewGamesSection } from "./NewGamesSection";
+import type { GameCard as StoreGame } from "../../api/game/types";
 
-interface Game {
+interface UiGame {
   id: string;
   title: string;
   image: string;
@@ -17,30 +17,45 @@ interface Game {
 }
 
 interface GameGridProps {
-  games: Game[];
+  games: StoreGame[];
   selectedCategory: string;
   onCategoryChange?: (category: string) => void;
   loading?: boolean;
 }
 
 export function GameGrid({
-  games,
+  games = [],
   selectedCategory,
   onCategoryChange,
   loading,
 }: GameGridProps) {
-  const getReviewCount = (value: string) => {
-    const numeric = parseFloat(value.replace(/[^0-9.]/g, ""));
-    if (Number.isNaN(numeric)) return 0;
-    if (value.includes("만")) return numeric * 10000;
-    if (/[mk]/i.test(value)) {
-      if (/m/i.test(value)) return numeric * 1_000_000;
-      if (/k/i.test(value)) return numeric * 1000;
-    }
-    return numeric;
-  };
+  const currencyFormatter = new Intl.NumberFormat("ko-KR", {
+    style: "currency",
+    currency: "KRW",
+    maximumFractionDigits: 0,
+  });
 
-  if (!games.length) {
+  const toUiGame = (game: StoreGame): UiGame => ({
+    id: String(game.id),
+    title: game.name,
+    image: game.thumbnailUrl,
+    rating: game.averageScore ?? 0,
+    reviews: (game.reviewCount ?? 0).toLocaleString("ko-KR"),
+    genre: game.tags[0] ?? "장르 미정",
+    tags: game.tags,
+    price:
+      (game.price ?? 0) <= 0
+        ? "무료"
+        : currencyFormatter.format(game.price ?? 0),
+    description: "게임 소개가 준비 중입니다.",
+  });
+
+  const adaptedGames = games.map((game) => ({
+    raw: game,
+    ui: toUiGame(game),
+  }));
+
+  if (!adaptedGames.length) {
     return (
       <main className="flex-1 px-4 py-6 max-w-7xl mx-auto">
         <div className="rounded-lg border border-primary/20 bg-background/80 p-6 text-center text-muted-foreground">
@@ -52,50 +67,81 @@ export function GameGrid({
     );
   }
 
-  // Filter games for different sections
-  const sortedByRating = [...games].sort((a, b) => b.rating - a.rating);
+  const sortedByRating = [...adaptedGames].sort(
+    (a, b) => (b.raw.averageScore ?? 0) - (a.raw.averageScore ?? 0)
+  );
   const topRatedGames = sortedByRating
-    .filter((game) => game.rating >= 4.7)
-    .slice(0, 6);
+    .filter((entry) => (entry.raw.averageScore ?? 0) >= 4.7)
+    .slice(0, 6)
+    .map((entry) => entry.ui);
 
-  const bundleDeals = games
-    .filter((game) => game.price !== "무료" && Math.random() > 0.5) // Mock bundle logic
-    .slice(0, 6);
+  const bundleDeals = adaptedGames
+    .filter((entry) => (entry.raw.price ?? 0) > 0 && Math.random() > 0.5)
+    .slice(0, 6)
+    .map((entry) => entry.ui);
 
-  const freeGames = games.filter((game) => game.price === "무료").slice(0, 6);
+  const freeGames = adaptedGames
+    .filter((entry) => (entry.raw.price ?? 0) === 0)
+    .slice(0, 6)
+    .map((entry) => entry.ui);
 
-  const newReleases = games
-    .filter((game) => ["7", "8", "1"].includes(game.id)) // Mock new releases
-    .slice(0, 6);
+  const isNewRelease = (releaseDate?: string) => {
+    if (!releaseDate) return false;
+    const releasedAt = new Date(releaseDate).getTime();
+    if (Number.isNaN(releasedAt)) return false;
+    const ninetyDays = 90 * 24 * 60 * 60 * 1000;
+    return Date.now() - releasedAt <= ninetyDays;
+  };
 
-  const trendingGames = games
-    .filter((game) => getReviewCount(game.reviews) >= 200)
-    .slice(0, 6);
+  const newReleases = adaptedGames
+    .filter((entry) => isNewRelease(entry.raw.releaseDate))
+    .slice(0, 6)
+    .map((entry) => entry.ui);
+
+  const trendingGames = adaptedGames
+    .filter((entry) => (entry.raw.reviewCount ?? 0) >= 200)
+    .slice(0, 6)
+    .map((entry) => entry.ui);
+
+  const featuredEntry = sortedByRating[0] ?? adaptedGames[0];
+  const featuredGame = featuredEntry?.ui;
+
+  if (!featuredGame) {
+    return (
+      <main className="flex-1 px-4 py-6 max-w-7xl mx-auto">
+        <div className="rounded-lg border border-primary/20 bg-background/80 p-6 text-center text-muted-foreground">
+          {loading
+            ? "게임 정보를 불러오는 중입니다..."
+            : "표시할 게임 데이터가 없습니다."}
+        </div>
+      </main>
+    );
+  }
 
   // If a specific category is selected, show filtered results
   if (selectedCategory !== "recommended") {
-    const filteredGames = games.filter((game) => {
+    const filteredGames = adaptedGames.filter(({ raw, ui }) => {
       switch (selectedCategory) {
         case "trending":
-          return getReviewCount(game.reviews) >= 200;
+          return (raw.reviewCount ?? 0) >= 200;
         case "new":
-          return ["7", "8", "1"].includes(game.id);
+          return isNewRelease(raw.releaseDate);
         case "action":
-          return game.genre === "액션";
+          return ui.genre === "액션";
         case "rpg":
-          return game.genre === "RPG";
+          return ui.genre === "RPG";
         case "racing":
-          return game.genre === "레이싱";
+          return ui.genre === "레이싱";
         case "multiplayer":
-          return game.genre === "멀티플레이어";
+          return ui.genre === "멀티플레이어";
         case "puzzle":
-          return game.genre === "퍼즐";
+          return ui.genre === "퍼즐";
         case "simulation":
-          return game.genre === "시뮬레이션";
+          return ui.genre === "시뮬레이션";
         case "무료게임":
-          return game.price === "무료";
+          return (raw.price ?? 0) === 0;
         default:
-          return game.tags.some((tag) =>
+          return ui.tags.some((tag) =>
             tag.toLowerCase().includes(selectedCategory.toLowerCase())
           );
       }
@@ -128,18 +174,15 @@ export function GameGrid({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-          {filteredGames.map((game) => (
-            <div key={game.id} className="w-full">
-              <GameCard game={game} />
+          {filteredGames.map(({ ui }) => (
+            <div key={ui.id} className="w-full">
+              <GameCard game={ui} />
             </div>
           ))}
         </div>
       </main>
     );
   }
-
-  // Get featured game (highest rated game)
-  const featuredGame = sortedByRating[0];
 
   // Default home page with sections
   return (

@@ -23,7 +23,7 @@ import {
 } from "../y_ui/overlay/dropdown-menu";
 import { toast } from "sonner";
 import { useGameStore } from "../../stores/gameStore";
-import type { GameSummary } from "../../api/game/types";
+import type { GameCard } from "../../api/game/types";
 
 const categories = [
   "액션",
@@ -49,6 +49,27 @@ const platforms = [
   "Xbox",
   "Nintendo Switch",
 ];
+
+type PublisherGame = GameCard & {
+  title: string;
+  genre: string;
+  price: string;
+  rating: number;
+  reviews: string;
+  description: string;
+};
+
+function adaptGameCardForPublisher(game: GameCard): PublisherGame {
+  return {
+    ...game,
+    title: game.name,
+    genre: game.tags[0] ?? "기타",
+    price: String(game.price ?? 0),
+    rating: typeof game.averageScore === "number" ? game.averageScore : 0,
+    reviews: String(game.reviewCount ?? 0),
+    description: `${game.name}에 대한 설명이 준비 중입니다.`,
+  };
+}
 
 type SaleStatus = (typeof saleStatuses)[number]["id"];
 
@@ -143,8 +164,8 @@ const updateNoteTemplates = [
 const seasonLabels = ["봄", "여름", "가을", "겨울"];
 
 function generateDetailFromGame(
-  game: GameSummary,
-  collection: GameSummary[]
+  game: PublisherGame,
+  collection: PublisherGame[]
 ): GameDetail {
   const index = collection.findIndex((item) => item.id === game.id);
   const normalizedIndex = index >= 0 ? index : 0;
@@ -201,7 +222,7 @@ function extractPrice(value?: string) {
   return numeric || "0";
 }
 
-function getReviewStatusCounts(games: GameSummary[]) {
+function getReviewStatusCounts(games: PublisherGame[]) {
   const counts = { waiting: 0, progress: 0, answered: 0 };
   games.forEach((_, index) => {
     const key =
@@ -214,9 +235,13 @@ function getReviewStatusCounts(games: GameSummary[]) {
 export default function PublisherGameEditPage() {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
-  const games = useGameStore((state) => state.games);
+  const rawGames = useGameStore((state) => state.games);
   const fetchGames = useGameStore((state) => state.fetchGames);
   const gamesLoading = useGameStore((state) => state.loading);
+  const games = useMemo(
+    () => rawGames.map(adaptGameCardForPublisher),
+    [rawGames]
+  );
   const counts = useMemo(() => getReviewStatusCounts(games), [games]);
   const [searchTerm, setSearchTerm] = useState("");
   const [title, setTitle] = useState("");
@@ -241,10 +266,10 @@ export default function PublisherGameEditPage() {
   >([]);
 
   useEffect(() => {
-    if (!games.length && !gamesLoading) {
+    if (!rawGames.length && !gamesLoading) {
       fetchGames();
     }
-  }, [fetchGames, games.length, gamesLoading]);
+  }, [fetchGames, rawGames.length, gamesLoading]);
 
   const game = useMemo(
     () => games.find((item) => item.id === gameId),
@@ -320,8 +345,8 @@ export default function PublisherGameEditPage() {
     setFeatures((prev) => prev.filter((feature) => feature !== target));
   };
 
-  const applyTemplate = (item: GameSummary) => {
-    const template = defaultDetails[item.id] ?? fallbackDetails;
+  const applyTemplate = (item: PublisherGame) => {
+    const template = defaultDetails[String(item.id)] ?? fallbackDetails;
     setTitle(item.title);
     setCategory(template.category || item.genre || categories[0]);
     setPrice(template.price || extractPrice(item.price));

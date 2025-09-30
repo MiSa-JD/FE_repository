@@ -17,7 +17,7 @@ import {
 import { toast } from "sonner";
 import { Gamepad, Search, ChevronDown, Wand2 } from "lucide-react";
 import { useGameStore } from "../../stores/gameStore";
-import type { GameSummary } from "../../api/game/types";
+import type { GameCard } from "../../api/game/types";
 
 const categories = [
   "액션",
@@ -45,7 +45,26 @@ const featurePresets = [
   "지원 언어 12개",
 ];
 
-function getReviewStatusCounts(games: GameSummary[]) {
+type PublisherGame = GameCard & {
+  title: string;
+  genre: string;
+  price: string;
+  reviews: string;
+  description: string;
+};
+
+function adaptGameCardForPublisher(game: GameCard): PublisherGame {
+  return {
+    ...game,
+    title: game.name,
+    genre: game.tags[0] ?? "기타",
+    price: String(game.price ?? 0),
+    reviews: String(game.reviewCount ?? 0),
+    description: `${game.name}에 대한 설명이 준비 중입니다.`,
+  };
+}
+
+function getReviewStatusCounts(games: PublisherGame[]) {
   const counts = { waiting: 0, progress: 0, answered: 0 };
   games.forEach((_, index) => {
     const key =
@@ -57,16 +76,20 @@ function getReviewStatusCounts(games: GameSummary[]) {
 
 export default function PublisherGameUploadPage() {
   const navigate = useNavigate();
-  const games = useGameStore((state) => state.games);
+  const rawGames = useGameStore((state) => state.games);
   const fetchGames = useGameStore((state) => state.fetchGames);
   const gamesLoading = useGameStore((state) => state.loading);
+  const games = useMemo(
+    () => rawGames.map(adaptGameCardForPublisher),
+    [rawGames]
+  );
   const counts = useMemo(() => getReviewStatusCounts(games), [games]);
 
   useEffect(() => {
-    if (!games.length && !gamesLoading) {
+    if (!rawGames.length && !gamesLoading) {
       fetchGames();
     }
-  }, [fetchGames, games.length, gamesLoading]);
+  }, [fetchGames, rawGames.length, gamesLoading]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [title, setTitle] = useState("");

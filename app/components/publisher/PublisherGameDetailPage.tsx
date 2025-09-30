@@ -25,7 +25,7 @@ import { Separator } from "../y_ui/base/separator";
 import { Textarea } from "../y_ui/base/textarea";
 import { toast } from "sonner";
 import { useGameStore } from "../../stores/gameStore";
-import type { GameSummary } from "../../api/game/types";
+import type { GameCard } from "../../api/game/types";
 
 interface SystemRequirement {
   os: string;
@@ -207,7 +207,7 @@ function parseNumber(value: string | number | undefined) {
 }
 
 function buildOverviewFromGame(
-  game: GameSummary,
+  game: GameCard,
   index: number
 ): GameOverview {
   const normalizedIndex = index >= 0 ? index : 0;
@@ -215,7 +215,9 @@ function buildOverviewFromGame(
   const priceValue = parseNumber(game.price);
   const totalSales = 900 + normalizedIndex * 140;
   const reviewCount =
-    parseNumber(game.reviews) || Math.round(totalSales * 0.32);
+    typeof game.reviewCount === "number"
+      ? game.reviewCount
+      : Math.round(totalSales * 0.32);
   const revenue =
     priceValue > 0
       ? priceValue * totalSales
@@ -238,7 +240,7 @@ function buildOverviewFromGame(
       2,
       "0"
     )}-${String(20 - idx * 4).padStart(2, "0")}`,
-    summary: `${game.title} ${
+    summary: `${game.name} ${
       updateTopics[(idx + normalizedIndex) % updateTopics.length]
     } 업데이트`,
   }));
@@ -265,15 +267,15 @@ function buildOverviewFromGame(
     revenue,
     totalSales,
     rating:
-      typeof game.rating === "number"
-        ? game.rating
-        : parseFloat(String(game.rating)) || 4.5,
+      typeof game.averageScore === "number"
+        ? game.averageScore
+        : 4.5,
     reviewCount,
     activePlayers: Math.max(320, Math.round(totalSales * 0.6)),
     refundRate: Number((1.2 + (normalizedIndex % 4) * 0.35).toFixed(1)),
-    description: game.description,
+    description: `${game.name}에 대한 상세 설명이 준비 중입니다.`,
     platforms,
-    genre: game.genre,
+    genre: game.tags[0] ?? "장르 미정",
     tags: [...game.tags],
     updates,
     notices,
@@ -305,14 +307,16 @@ export default function PublisherGameDetailPage() {
     }
   }, [fetchGames, games.length, gamesLoading]);
 
+  const numericGameId = gameId ? Number(gameId) : NaN;
   const game = useMemo(
-    () => games.find((item) => item.id === gameId),
-    [games, gameId]
+    () => games.find((item) => item.id === numericGameId),
+    [games, numericGameId]
   );
   const detail = useMemo(() => {
     if (!game) return undefined;
     const index = games.findIndex((item) => item.id === game.id);
-    return gameDetails[game.id] ?? buildOverviewFromGame(game, index >= 0 ? index : 0);
+    const presetDetail = gameDetails[String(game.id)];
+    return presetDetail ?? buildOverviewFromGame(game, index >= 0 ? index : 0);
   }, [game, games]);
 
   if (!game && gamesLoading) {
@@ -377,7 +381,7 @@ export default function PublisherGameDetailPage() {
 
   return (
     <PublisherLayout
-      title={`게임 관리 / ${game.title}`}
+      title={`게임 관리 / ${game.name}`}
       subtitle="게임의 성과와 콘텐츠를 한 곳에서 관리하세요."
       heroBadge={
         <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-200">
@@ -434,7 +438,7 @@ export default function PublisherGameDetailPage() {
                     </span>
                   </div>
                   <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white lg:text-4xl">
-                    {game.title}
+                    {game.name}
                   </h1>
                   <Badge className="mt-4 rounded-full border border-emerald-400/40 bg-emerald-500/15 px-4 py-1 text-xs text-emerald-100">
                     {detail.saleStatus}

@@ -13,7 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { PublisherLayout } from "./PublisherLayout";
 import { Search, Plus, ChevronDown, Star, Gamepad } from "lucide-react";
 import { useGameStore } from "../../stores/gameStore";
-import type { GameSummary } from "../../api/game/types";
+import type { GameCard } from "../../api/game/types";
 
 const sortOptions = [
   { id: "latest", label: "최신순" },
@@ -39,7 +39,7 @@ function formatCurrency(value?: number | string) {
   return `₩${number.toLocaleString()}`;
 }
 
-type ExtendedGame = GameSummary & {
+type ExtendedGame = GameCard & {
   status: "selling" | "review" | "paused" | "upcoming";
   revenue: number;
   unitsSold: number;
@@ -79,8 +79,8 @@ export default function PublisherGameManagementPage() {
           : "upcoming",
       revenue: 20000000 + index * 6000000,
       unitsSold: 500 + index * 120,
-      rating: Number(game.rating) || 4.5,
-      priceValue: Number(String(game.price).replace(/[^0-9]/g, "")) || 0,
+      rating: typeof game.averageScore === "number" ? game.averageScore : 0,
+      priceValue: typeof game.price === "number" ? game.price : 0,
     }));
   }, [games]);
 
@@ -93,7 +93,9 @@ export default function PublisherGameManagementPage() {
     }
     if (normalized) {
       list = list.filter((game) =>
-        `${game.title} ${game.genre}`.toLowerCase().includes(normalized)
+        `${game.name} ${game.tags.join(" ")}`
+          .toLowerCase()
+          .includes(normalized)
       );
     }
 
@@ -218,10 +220,10 @@ export default function PublisherGameManagementPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-semibold text-white">
-                      {game.title}
+                      {game.name}
                     </h3>
                     <p className="text-xs text-white/65">
-                      {game.genre} {game.price}
+                      {game.tags.slice(0, 3).join(" · ")}
                     </p>
                   </div>
                   <Badge className="rounded-full border border-emerald-400/40 bg-emerald-500/15 px-3 py-1 text-xs text-emerald-200">
@@ -252,7 +254,7 @@ export default function PublisherGameManagementPage() {
                     <p className="text-white/50">평점</p>
                     <span className="inline-flex items-center gap-1 text-sm font-semibold text-white">
                       <Star className="h-4 w-4 text-amber-300" />
-                      {game.rating?.toFixed(1) ?? "-"}
+                      {game.rating ? game.rating.toFixed(1) : "-"}
                     </span>
                   </div>
                 </div>

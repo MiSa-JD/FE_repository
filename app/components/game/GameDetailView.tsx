@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "../y_ui/base/card";
 import { Button } from "../y_ui/base/button";
 import { Badge } from "../y_ui/base/badge";
@@ -82,39 +82,84 @@ export function GameDetailView() {
     "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=60";
   const DEFAULT_MEDIA =
     "https://images.unsplash.com/photo-1614292253061-2ab1e3ada214?auto=format&fit=crop&w=1200&q=60";
-  const mediaItems = game?.media?.length
-    ? game.media
-    : [{ type: "image" as const, url: DEFAULT_MEDIA }];
+
+  const parseSpecs = (spec?: string) => {
+    if (!spec) return { minimum: [], recommended: [] };
+    const sections = spec
+      .split(/;+/)
+      .map((section) => section.trim())
+      .filter(Boolean);
+    const extract = (label: string) => {
+      const match = sections.find((section) => section.startsWith(label));
+      if (!match) return [] as string[];
+      const [, ...rest] = match.split(/:\s*/);
+      const afterColon = rest.join(":").trim();
+      if (!afterColon) return [] as string[];
+      return afterColon
+        .split("/")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    };
+    return {
+      minimum: extract("최소"),
+      recommended: extract("권장"),
+    };
+  };
+
+  const detail = useMemo(() => {
+    if (!game) return null;
+    const heroImage = game.media?.[0] ?? game.thumbnailUrl ?? DEFAULT_HERO;
+    const gallery = (
+      game.media && game.media.length ? game.media : [heroImage]
+    ).map((url) => ({ url }));
+    const specs = parseSpecs(game.spec);
+    return {
+      id: game.id,
+      title: game.name,
+      price: game.price,
+      discountRate: game.discountRate,
+      tags: game.tags ?? [],
+      releaseDate: game.releaseDate,
+      publisherName: game.publisherName,
+      reviewCount: game.reviewCount ?? 0,
+      averageScore: game.averageScore ?? 0,
+      description: game.description,
+      heroImage,
+      gallery,
+      specs,
+    };
+  }, [game]);
+
+  const mediaItems = detail?.gallery ?? [{ url: DEFAULT_MEDIA }];
 
   const [following, setFollowing] = useState<boolean>(false);
   useEffect(() => {
-    if (!game) return;
-    const saved = JSON.parse(
-      localStorage.getItem("followingGames") || "[]"
-    ) as number[];
-    setFollowing(saved.includes(game.id));
-  }, [game?.id]);
+    if (!detail) return;
+    const raw = JSON.parse(localStorage.getItem("followingGames") || "[]");
+    const saved = Array.isArray(raw) ? raw.map((value) => Number(value)) : [];
+    setFollowing(saved.includes(detail.id));
+  }, [detail?.id]);
 
   const toggleFollow = () => {
-    if (!game) return;
-    const saved = new Set<number>(
-      JSON.parse(localStorage.getItem("followingGames") || "[]")
-    );
-    if (saved.has(game.id)) saved.delete(game.id);
-    else saved.add(game.id);
+    if (!detail) return;
+    const raw = JSON.parse(localStorage.getItem("followingGames") || "[]");
+    const current = Array.isArray(raw) ? raw.map((value) => Number(value)) : [];
+    const saved = new Set<number>(current);
+    if (saved.has(detail.id)) saved.delete(detail.id);
+    else saved.add(detail.id);
     localStorage.setItem("followingGames", JSON.stringify(Array.from(saved)));
-    setFollowing(saved.has(game.id));
+    setFollowing(saved.has(detail.id));
   };
 
   const { fetchCart, gameIds } = useCartStore();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
-  const isAlreadyInCart = game ? gameIds.includes(game.id) : false;
+  const isAlreadyInCart = detail ? gameIds.includes(detail.id) : false;
 
   const handleAddToCart = async () => {
-    if (!game || isAlreadyInCart) return;
+    if (!detail || isAlreadyInCart) return;
     setIsAddingToCart(true);
     try {
-      await addGameToCart(game.id);
+      await addGameToCart(detail.id);
       toast.success("장바구니에 추가되었습니다.");
       fetchCart();
     } catch (err) {
@@ -133,21 +178,21 @@ export function GameDetailView() {
   const [editRating, setEditRating] = useState(5);
 
   useEffect(() => {
-    if (!game) return;
-    const key = `reviews:${game.id}`;
+    if (!detail) return;
+    const key = `reviews:${detail.id}`;
     const loaded = JSON.parse(localStorage.getItem(key) || "[]");
     setReviews(loaded);
-  }, [game?.id]);
+  }, [detail?.id]);
 
   const saveReviews = (list: Review[]) => {
-    if (!game) return;
-    const key = `reviews:${game.id}`;
+    if (!detail) return;
+    const key = `reviews:${detail.id}`;
     setReviews(list);
     localStorage.setItem(key, JSON.stringify(list));
   };
 
   const addReview = () => {
-    if (!game || !newText.trim()) return;
+    if (!detail || !newText.trim()) return;
     const review: Review = {
       id: String(Date.now()),
       author: "게스트",
@@ -176,23 +221,25 @@ export function GameDetailView() {
   };
 
   const averageRating = reviews.length
-    ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
+    ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(
+        1
+      )
     : "-";
 
   const boardSlug = useMemo(() => {
-    const title = (game?.title || "").toLowerCase();
+    const title = (detail?.title || "").toLowerCase();
     if (title.includes("neon") || title.includes("racing"))
       return "neon-racing";
     if (title.includes("cyber")) return "cyberpunk-2087";
     return "guide-hub";
-  }, [game?.title]);
+  }, [detail?.title]);
 
-  const originalPrice = game
-    ? Math.max(0, Math.round((game.price / 0.7) / 100) * 100)
+  const originalPrice = detail
+    ? detail.discountRate > 0 && detail.discountRate < 100
+      ? Math.max(0, Math.round(detail.price / (1 - detail.discountRate / 100)))
+      : detail.price
     : 0;
-  const discountPercent = game && originalPrice
-    ? Math.round(100 - (game.price / originalPrice) * 100)
-    : 0;
+  const discountPercent = detail?.discountRate ?? 0;
 
   const StarRatingSelector = ({
     value,
@@ -251,7 +298,7 @@ export function GameDetailView() {
     );
   }
 
-  if (!game) {
+  if (!detail) {
     return (
       <div className="container mx-auto px-6 py-10">
         <Card className="border-primary/20">
@@ -269,23 +316,26 @@ export function GameDetailView() {
         <div
           className="h-56 w-full bg-cover bg-center"
           style={{
-            backgroundImage: `linear-gradient( to right, rgba(2,6,23,0.6), rgba(2,6,23,0.1) ), url(${game.image || DEFAULT_HERO})`,
+            backgroundImage: `linear-gradient( to right, rgba(2,6,23,0.6), rgba(2,6,23,0.1) ), url(${detail.heroImage})`,
           }}
         />
         <div className="absolute inset-0 flex items-end">
           <div className="flex w-full items-end justify-between gap-4 p-6 md:p-8">
             <div>
-              <h1 className="text-3xl font-bold md:text-4xl">{game.title}</h1>
+              <h1 className="text-3xl font-bold md:text-4xl">{detail.title}</h1>
               <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                <span>발매일 {game.released}</span>
+                <span>발매일 {detail.releaseDate}</span>
+                <span>장르: {detail.tags[0] ?? "알 수 없음"}</span>
+                <span>배급: {detail.publisherName}</span>
                 <span>
-                  장르: {game.genres.join(", ") || "알 수 없음"}
-                </span>
-                <span>
-                  개발: {game.developer} / 배급: {game.publisher}
+                  평점: {detail.averageScore.toFixed(1)} / 리뷰{" "}
+                  {detail.reviewCount.toLocaleString("ko-KR")}
                 </span>
                 {usingMock && (
-                  <Badge variant="outline" className="border-primary/30 text-xs">
+                  <Badge
+                    variant="outline"
+                    className="border-primary/30 text-xs"
+                  >
                     모의 데이터
                   </Badge>
                 )}
@@ -322,10 +372,13 @@ export function GameDetailView() {
               <Carousel className="w-full">
                 <CarouselContent>
                   {mediaItems.map((item, index) => (
-                    <CarouselItem key={`${item.url}-${index}`} className="relative">
+                    <CarouselItem
+                      key={`${item.url}-${index}`}
+                      className="relative"
+                    >
                       <img
                         src={item.url}
-                        alt={`${game.title} 미디어 ${index + 1}`}
+                        alt={`${detail.title} 미디어 ${index + 1}`}
                         className="h-64 w-full rounded-xl object-cover"
                       />
                     </CarouselItem>
@@ -335,48 +388,50 @@ export function GameDetailView() {
                 <CarouselNext />
               </Carousel>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground">
-                    주요 특징
-                  </h3>
-                  <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                    {game.features.map((feature) => (
-                      <li key={feature}>• {feature}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground">
-                    테마
-                  </h3>
-                  <ul className="mt-2 flex flex-wrap gap-2">
-                    {game.themes.map((theme) => (
-                      <Badge key={theme} variant="secondary">
-                        {theme}
-                      </Badge>
-                    ))}
-                  </ul>
-                </div>
-              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {detail.description || "게임 소개가 준비 중입니다."}
+              </p>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <h3 className="text-sm font-semibold text-muted-foreground">
+                    태그:
+                  </h3>
+                  <ul className="mt-2 flex flex-wrap gap-2">
+                    {(detail.tags.length ? detail.tags : ["정보 없음"]).map(
+                      (theme) => (
+                        <Badge key={theme} variant="secondary">
+                          {theme}
+                        </Badge>
+                      )
+                    )}
+                  </ul>
+                </div>
+              </div>
+
+              <div className="grid gap-4 grid-cols-2">
+                <div className="bg-red-500">
+                  <h3 className="text-sm font-semibold text-muted-foreground">
                     최소 사양
                   </h3>
                   <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                    {game.requirements.minimum.map((item) => (
+                    {(detail.specs.minimum.length
+                      ? detail.specs.minimum
+                      : ["제공된 최소 사양 정보가 없습니다."]
+                    ).map((item) => (
                       <li key={item}>• {item}</li>
                     ))}
                   </ul>
                 </div>
-                <div>
+                <div className="bg-blue-500">
                   <h3 className="text-sm font-semibold text-muted-foreground">
                     권장 사양
                   </h3>
                   <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                    {game.requirements.recommended.map((item) => (
+                    {(detail.specs.recommended.length
+                      ? detail.specs.recommended
+                      : ["제공된 권장 사양 정보가 없습니다."]
+                    ).map((item) => (
                       <li key={item}>• {item}</li>
                     ))}
                   </ul>
@@ -389,21 +444,15 @@ export function GameDetailView() {
             <CardHeader>
               <CardTitle>뉴스 & 업데이트</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {game.news.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between rounded-lg border border-primary/10 bg-primary/5 px-4 py-3"
-                >
-                  <div>
-                    <p className="font-medium">{item.title}</p>
-                    <p className="text-xs text-muted-foreground">{item.date}</p>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    자세히 보기
-                  </Button>
-                </div>
-              ))}
+            <CardContent className="space-y-4 text-sm text-muted-foreground">
+              <p>공식 뉴스 데이터가 아직 연결되지 않았습니다.</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => toast.info("뉴스 피드 기능은 준비 중입니다.")}
+              >
+                피드 알림 받기
+              </Button>
             </CardContent>
           </Card>
         </section>
@@ -422,12 +471,16 @@ export function GameDetailView() {
               </div>
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>할인율</span>
-                <Badge variant="secondary">-{discountPercent}%</Badge>
+                {discountPercent > 0 ? (
+                  <Badge variant="secondary">-{discountPercent}%</Badge>
+                ) : (
+                  <span className="text-muted-foreground">없음</span>
+                )}
               </div>
               <Separator />
               <div className="flex items-center justify-between text-2xl font-semibold text-primary">
                 <span>현재가</span>
-                <span>{KRW(game.price)}</span>
+                <span>{KRW(detail.price)}</span>
               </div>
               <div className="flex items-center gap-3">
                 <Button
@@ -461,7 +514,9 @@ export function GameDetailView() {
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <div className="flex items-center justify-between">
                 <span>평균 사용자 평점</span>
-                <span className="font-semibold text-primary">{averageRating}</span>
+                <span className="font-semibold text-primary">
+                  {averageRating}
+                </span>
               </div>
               <Button
                 variant="outline"

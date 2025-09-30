@@ -17,7 +17,7 @@ import {
 } from "../y_ui/form-controls/toggle-group";
 import { Star, Share2 } from "lucide-react";
 import { searchGames, getSearchFilters } from "../../api/game/gameApi";
-import type { GameSearchItem } from "../../api/game/types";
+import type { GameCard } from "../../api/game/types";
 
 const KRW = (v: number) =>
   new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" }).format(
@@ -80,7 +80,7 @@ export function GameSearchView() {
     searchParams.get("sort") || "출시일"
   );
 
-  const [games, setGames] = useState<GameSearchItem[]>([]);
+  const [games, setGames] = useState<GameCard[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [usingMock, setUsingMock] = useState<boolean>(false);
@@ -116,7 +116,7 @@ export function GameSearchView() {
       try {
         const { data, isMock } = await searchGames(query);
         if (!canceled) {
-          setGames(data);
+          setGames(data as unknown as GameCard[]);
           setUsingMock(isMock);
         }
       } catch (err) {
@@ -171,23 +171,23 @@ export function GameSearchView() {
   const filtered = useMemo(() => {
     const base = query
       ? games.filter((game) =>
-          game.title.toLowerCase().includes(query.toLowerCase())
+          game.name.toLowerCase().includes(query.toLowerCase())
         )
       : games;
 
     const byTags = base.filter((g) => {
       const genreOk =
-        genres.length === 0 || genres.some((t) => g.genres.includes(t));
+        genres.length === 0 || genres.some((t) => g.tags.includes(t));
       const featureOk =
-        features.length === 0 || features.some((t) => g.features.includes(t));
+        features.length === 0 || features.some((t) => g.tags.includes(t));
       const themeOk =
-        themes.length === 0 || themes.some((t) => g.themes.includes(t));
+        themes.length === 0 || themes.some((t) => g.tags.includes(t));
       return genreOk && featureOk && themeOk;
     });
 
     const byPeriod = byTags.filter((g) => {
       if (period === "모든 기간") return true;
-      const releasedAt = new Date(g.released).getTime();
+      const releasedAt = new Date(g.releaseDate).getTime();
       const now = Date.now();
       switch (period) {
         case "최근 1개월":
@@ -219,7 +219,7 @@ export function GameSearchView() {
     const byRating = byPrice.filter((g) => {
       if (rating === "모든 평점") return true;
       const threshold = Number(rating.replace("점 이상", ""));
-      return g.rating >= threshold;
+      return g.averageScore >= threshold;
     });
 
     const sorted = [...byRating];
@@ -228,11 +228,12 @@ export function GameSearchView() {
         sorted.sort((a, b) => a.price - b.price);
         break;
       case "평점":
-        sorted.sort((a, b) => b.rating - a.rating);
+        sorted.sort((a, b) => b.averageScore - a.averageScore);
         break;
       default:
         sorted.sort(
-          (a, b) => new Date(b.released).getTime() - new Date(a.released).getTime()
+          (a, b) =>
+            new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime()
         );
         break;
     }
@@ -433,12 +434,12 @@ export function GameSearchView() {
                   <CardHeader className="space-y-2">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg font-semibold">
-                        {game.title}
+                        {game.name}
                       </CardTitle>
-                      <Badge>평점 {game.rating.toFixed(1)}</Badge>
+                      <Badge>평점 {game.averageScore.toFixed(1)}</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      출시일: {new Date(game.released).toLocaleDateString()}
+                      출시일: {new Date(game.releaseDate).toLocaleDateString()}
                     </p>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -456,13 +457,11 @@ export function GameSearchView() {
                       </div>
                     </div>
                     <div className="space-y-2 text-sm text-muted-foreground">
-                      <div>장르: {game.genres.join(", ")}</div>
-                      <div>특징: {game.features.join(", ")}</div>
-                      <div>테마: {game.themes.join(", ")}</div>
+                      <div>태그: {game.tags.join(", ")}</div>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Star className="h-4 w-4" />
-                      <span>{game.rating.toFixed(1)}</span>
+                      <span>{game.averageScore.toFixed(1)}</span>
                       <Share2 className="h-4 w-4 ml-auto" />
                     </div>
                     <div className="flex gap-2">
