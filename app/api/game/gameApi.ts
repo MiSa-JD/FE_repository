@@ -1,11 +1,6 @@
 import { fetchApi } from "../fetchApi";
-import { mockGameDetails, mockGames, mockSearchGames } from "./mocks";
-import type {
-  ApiResult,
-  GameDetail,
-  GameSearchItem,
-  GameSummary,
-} from "./types";
+import { mockGameDetails, mockGames } from "./mocks";
+import type { ApiResult, GameCard, GameDetail } from "./types";
 
 function cloneFallback<T>(value: T): T {
   if (Array.isArray(value)) {
@@ -34,8 +29,8 @@ async function requestWithFallback<T>(
   }
 }
 
-export async function getGames(): Promise<ApiResult<GameSummary[]>> {
-  return requestWithFallback<GameSummary[]>("/games", mockGames);
+export async function getGames(): Promise<ApiResult<GameCard[]>> {
+  return requestWithFallback<GameCard[]>("/games", mockGames);
 }
 
 export async function getGameDetail(
@@ -52,16 +47,16 @@ export async function getGameDetail(
 
 export async function searchGames(
   query: string
-): Promise<ApiResult<GameSearchItem[]>> {
+): Promise<ApiResult<GameCard[]>> {
   const params = new URLSearchParams();
   if (query) params.set("query", query);
   const path = `/games/search${params.toString() ? `?${params}` : ""}`;
   const fallback = query
-    ? mockSearchGames.filter((game) =>
-        game.title.toLowerCase().includes(query.toLowerCase())
+    ? mockGames.filter((game) =>
+        game.name.toLowerCase().includes(query.toLowerCase())
       )
-    : mockSearchGames;
-  return requestWithFallback<GameSearchItem[]>(path, fallback);
+    : mockGames;
+  return requestWithFallback<GameCard[]>(path, fallback);
 }
 
 export async function getSearchFilters(): Promise<
@@ -71,16 +66,13 @@ export async function getSearchFilters(): Promise<
     themes: string[];
   }>
 > {
+  const tags = Array.from(
+    new Set(mockGames.flatMap((game: GameCard) => game.tags ?? []))
+  ).sort();
   const fallback = {
-    genres: Array.from(
-      new Set(mockSearchGames.flatMap((game) => game.genres))
-    ).sort(),
-    features: Array.from(
-      new Set(mockSearchGames.flatMap((game) => game.features))
-    ).sort(),
-    themes: Array.from(
-      new Set(mockSearchGames.flatMap((game) => game.themes))
-    ).sort(),
+    genres: tags,
+    features: tags,
+    themes: tags,
   };
   return requestWithFallback("/games/filters", fallback);
 }
