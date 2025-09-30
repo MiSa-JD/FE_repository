@@ -24,7 +24,7 @@ const KRW = (v: number) =>
     v
   );
 
-const defaultGenres = [
+const defaultTags = [
   "RPG",
   "액션",
   "어드벤처",
@@ -33,9 +33,12 @@ const defaultGenres = [
   "레이싱",
   "퍼즐",
   "인디",
-];
-
-const defaultFeatures = [
+  "판타지",
+  "SF",
+  "사이버펑크",
+  "중세",
+  "현대",
+  "호러",
   "오픈월드",
   "멀티플레이어",
   "싱글플레이어",
@@ -45,27 +48,12 @@ const defaultFeatures = [
   "샌드박스",
 ];
 
-const defaultThemes = [
-  "판타지",
-  "SF",
-  "사이버펑크",
-  "중세",
-  "현대",
-  "호러",
-];
-
 export function GameSearchView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const query = (searchParams.get("query") || "").trim();
 
-  const [genres, setGenres] = useState<string[]>(
-    searchParams.get("genres")?.split(",").filter(Boolean) || []
-  );
-  const [features, setFeatures] = useState<string[]>(
-    searchParams.get("features")?.split(",").filter(Boolean) || []
-  );
-  const [themes, setThemes] = useState<string[]>(
-    searchParams.get("themes")?.split(",").filter(Boolean) || []
+  const [tags, setTags] = useState<string[]>(
+    searchParams.get("tags")?.split(",").filter(Boolean) || []
   );
   const [period, setPeriod] = useState<string>(
     searchParams.get("period") || "모든 기간"
@@ -85,9 +73,7 @@ export function GameSearchView() {
   const [error, setError] = useState<string | null>(null);
   const [usingMock, setUsingMock] = useState<boolean>(false);
   const [filters, setFilters] = useState({
-    genres: defaultGenres,
-    features: defaultFeatures,
-    themes: defaultThemes,
+    tags: defaultTags,
   });
 
   useEffect(() => {
@@ -96,9 +82,7 @@ export function GameSearchView() {
       const { data } = await getSearchFilters();
       if (!canceled) {
         setFilters({
-          genres: data.genres.length ? data.genres : defaultGenres,
-          features: data.features.length ? data.features : defaultFeatures,
-          themes: data.themes.length ? data.themes : defaultThemes,
+          tags: data.genres.length ? data.genres : defaultTags,
         });
       }
     };
@@ -143,9 +127,7 @@ export function GameSearchView() {
   useEffect(() => {
     const params = new URLSearchParams();
     if (query) params.set("query", query);
-    if (genres.length) params.set("genres", genres.join(","));
-    if (features.length) params.set("features", features.join(","));
-    if (themes.length) params.set("themes", themes.join(","));
+    if (tags.length) params.set("genres", tags.join(","));
     if (period !== "모든 기간") params.set("period", period);
     if (price !== "모든 가격") params.set("price", price);
     if (rating !== "모든 평점") params.set("rating", rating);
@@ -157,14 +139,12 @@ export function GameSearchView() {
     }
   }, [
     currentParamString,
-    features,
-    genres,
+    tags,
     period,
     price,
     query,
     rating,
     sort,
-    themes,
     setSearchParams,
   ]);
 
@@ -176,13 +156,8 @@ export function GameSearchView() {
       : games;
 
     const byTags = base.filter((g) => {
-      const genreOk =
-        genres.length === 0 || genres.some((t) => g.tags.includes(t));
-      const featureOk =
-        features.length === 0 || features.some((t) => g.tags.includes(t));
-      const themeOk =
-        themes.length === 0 || themes.some((t) => g.tags.includes(t));
-      return genreOk && featureOk && themeOk;
+      const tagOk = tags.length === 0 || tags.some((t) => g.tags.includes(t));
+      return tagOk;
     });
 
     const byPeriod = byTags.filter((g) => {
@@ -233,13 +208,14 @@ export function GameSearchView() {
       default:
         sorted.sort(
           (a, b) =>
-            new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime()
+            new Date(b.releaseDate).getTime() -
+            new Date(a.releaseDate).getTime()
         );
         break;
     }
 
     return sorted;
-  }, [features, games, genres, period, price, query, rating, sort, themes]);
+  }, [games, tags, period, price, query, rating, sort]);
 
   return (
     <div className="container mx-auto px-6 py-6">
@@ -247,58 +223,18 @@ export function GameSearchView() {
         <aside className="w-full space-y-6 lg:w-72">
           <Card className="border border-primary/20">
             <CardHeader>
-              <CardTitle className="text-base">장르</CardTitle>
+              <CardTitle className="text-base">태그</CardTitle>
             </CardHeader>
             <CardContent>
               <ToggleGroup
                 type="multiple"
-                value={genres}
-                onValueChange={setGenres}
+                value={tags}
+                onValueChange={setTags}
                 className="flex flex-wrap gap-2"
               >
-                {filters.genres.map((genre) => (
-                  <ToggleGroupItem key={genre} value={genre}>
-                    {genre}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-primary/20">
-            <CardHeader>
-              <CardTitle className="text-base">특징</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ToggleGroup
-                type="multiple"
-                value={features}
-                onValueChange={setFeatures}
-                className="flex flex-wrap gap-2"
-              >
-                {filters.features.map((feature) => (
-                  <ToggleGroupItem key={feature} value={feature}>
-                    {feature}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-primary/20">
-            <CardHeader>
-              <CardTitle className="text-base">테마</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ToggleGroup
-                type="multiple"
-                value={themes}
-                onValueChange={setThemes}
-                className="flex flex-wrap gap-2"
-              >
-                {filters.themes.map((theme) => (
-                  <ToggleGroupItem key={theme} value={theme}>
-                    {theme}
+                {filters.tags.map((tag) => (
+                  <ToggleGroupItem key={tag} value={tag}>
+                    {tag}
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
@@ -326,13 +262,16 @@ export function GameSearchView() {
                       <SelectValue placeholder="모든 기간" />
                     </SelectTrigger>
                     <SelectContent>
-                      {["모든 기간", "최근 1개월", "최근 3개월", "최근 1년"].map(
-                        (option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        )
-                      )}
+                      {[
+                        "모든 기간",
+                        "최근 1개월",
+                        "최근 3개월",
+                        "최근 1년",
+                      ].map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -344,13 +283,17 @@ export function GameSearchView() {
                       <SelectValue placeholder="모든 가격" />
                     </SelectTrigger>
                     <SelectContent>
-                      {["모든 가격", "무료", "₩30,000 이하", "₩60,000 이하", "₩60,000 이상"].map(
-                        (option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        )
-                      )}
+                      {[
+                        "모든 가격",
+                        "무료",
+                        "₩30,000 이하",
+                        "₩60,000 이하",
+                        "₩60,000 이상",
+                      ].map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -362,13 +305,16 @@ export function GameSearchView() {
                       <SelectValue placeholder="모든 평점" />
                     </SelectTrigger>
                     <SelectContent>
-                      {["모든 평점", "4.0점 이상", "4.5점 이상", "4.8점 이상"].map(
-                        (option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        )
-                      )}
+                      {[
+                        "모든 평점",
+                        "4.0점 이상",
+                        "4.5점 이상",
+                        "4.8점 이상",
+                      ].map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -451,9 +397,7 @@ export function GameSearchView() {
                         <Button size="sm" variant="outline">
                           장바구니 담기
                         </Button>
-                        <Button size="sm">
-                          구매하기
-                        </Button>
+                        <Button size="sm">구매하기</Button>
                       </div>
                     </div>
                     <div className="space-y-2 text-sm text-muted-foreground">
